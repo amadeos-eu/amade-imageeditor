@@ -22,7 +22,7 @@ public final class ImageOperations {
     }
 
     // --8<-- [start:apply]
-    public static BufferedImage apply(BufferedImage image, Edit edit) {
+    public static BufferedImage apply(BufferedImage image, Edit.PixelEdit edit) {
         return switch (edit) {
             case Edit.Crop crop -> crop(image, crop.area());
             case Edit.Turn turn -> turn(image, turn.orientation());
@@ -239,7 +239,7 @@ public final class ImageOperations {
         return image.getColorModel().hasAlpha();
     }
 
-    static BufferedImage copy(BufferedImage image) {
+    public static BufferedImage copy(BufferedImage image) {
         BufferedImage result = blank(image.getWidth(), image.getHeight(), hasAlpha(image));
         Graphics2D g = result.createGraphics();
         g.setComposite(AlphaComposite.Src);
@@ -248,7 +248,7 @@ public final class ImageOperations {
         return result;
     }
 
-    private static BufferedImage blank(int width, int height, boolean alpha) {
+    public static BufferedImage blank(int width, int height, boolean alpha) {
         return new BufferedImage(width, height, alpha ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
     }
 

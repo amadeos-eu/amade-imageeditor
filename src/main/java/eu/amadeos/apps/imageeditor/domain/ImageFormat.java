@@ -7,8 +7,9 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * The picture formats the editor knows. The first five can be saved; the others open (through the TwelveMonkeys
- * ImageIO plugins) and are saved as one of the first five.
+ * The picture formats the editor knows. The first six can be saved; the others open (through the TwelveMonkeys
+ * ImageIO plugins) and are saved as one of the first six. Only OpenRaster keeps layers; the others get the layers
+ * merged into one picture.
  */
 public enum ImageFormat {
     JPEG("JPEG", "jpg", true, false, "jpg", "jpeg", "jpe", "jfif"),
@@ -16,6 +17,8 @@ public enum ImageFormat {
     WEBP("WebP", "webp", true, true, "webp"),
     TIFF("TIFF", "tif", true, true, "tif", "tiff"),
     BMP("BMP", "bmp", true, false, "bmp", "dib"),
+    /** OpenRaster: all layers, read by GIMP, Krita and MyPaint. */
+    ORA("OpenRaster", "ora", true, true, "ora"),
     GIF("GIF", "gif", false, true, "gif"),
     PNM("PNM", "pnm", false, false, "pnm", "pbm", "pgm", "ppm", "pam"),
     TGA("TGA", "tga", false, true, "tga"),
@@ -62,6 +65,11 @@ public enum ImageFormat {
     /** True if the format keeps transparent pixels. */
     public boolean alpha() {
         return alpha;
+    }
+
+    /** True if the format keeps layers, so that saving to it merges nothing. */
+    public boolean layers() {
+        return this == ORA;
     }
 
     /** True if saving loses detail, so that saving again and again makes it worse. */

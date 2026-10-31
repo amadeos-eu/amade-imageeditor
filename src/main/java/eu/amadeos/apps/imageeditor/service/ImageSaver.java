@@ -2,6 +2,7 @@ package eu.amadeos.apps.imageeditor.service;
 
 import eu.amadeos.apps.imageeditor.domain.ImageFormat;
 import eu.amadeos.apps.imageeditor.domain.Orientation;
+import eu.amadeos.apps.imageeditor.domain.Picture;
 import eu.amadeos.apps.imageeditor.domain.SaveOptions;
 import eu.amadeos.commons.process.CommandRunner;
 import eu.amadeos.commons.process.ProgramMissingException;
@@ -33,6 +34,7 @@ import java.util.Optional;
  *     compressed blocks instead, without any loss.</li>
  *     <li>PNG, BMP with ImageIO; TIFF with LZW compression.</li>
  *     <li>WebP with {@code cwebp} (package webp), from a temporary PNG.</li>
+ *     <li>OpenRaster with all layers ({@link OpenRaster}); every other format gets the layers merged.</li>
  * </ul>
  */
 public class ImageSaver {
@@ -60,6 +62,16 @@ public class ImageSaver {
         public CwebpMissingException() {
             super("cwebp is not installed");
         }
+    }
+
+    /** Saves a picture with layers: OpenRaster keeps them, the other formats get them merged. */
+    public Result save(Picture picture, Optional<Orientation> onlyTurns, Source source, Path target,
+                       SaveOptions options) throws IOException, InterruptedException {
+        if (options.format().layers()) {
+            OpenRaster.write(picture, target);
+            return new Result(false, false);
+        }
+        return save(picture.composite(), onlyTurns, source, target, options);
     }
 
     /**
