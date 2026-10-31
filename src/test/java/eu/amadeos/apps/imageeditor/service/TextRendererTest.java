@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.awt.Color;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,11 +17,17 @@ class TextRendererTest {
 
     @Test
     void theTextLiesAroundItsCentre() {
-        TextRenderer.Rendered r = TextRenderer.render(box(TextBox.Effect.NONE, 0));
+        TextBox box = box(TextBox.Effect.NONE, 0);
+        // The block of lines is placed exactly by its middle ...
+        java.awt.geom.Point2D[] frame = TextRenderer.frame(box);
+        assertEquals(300, (frame[0].getX() + frame[2].getX()) / 2, 1e-9);
+        assertEquals(200, (frame[0].getY() + frame[2].getY()) / 2, 1e-9);
+        // ... and the drawn letters lie around it; how far their ink is off the block's middle depends on the font.
+        TextRenderer.Rendered r = TextRenderer.render(box);
         double cx = r.x() + r.image().getWidth() / 2.0, cy = r.y() + r.image().getHeight() / 2.0;
-        assertTrue(Math.abs(cx - 300) < 4, "x " + cx);
-        assertTrue(Math.abs(cy - 200) < 4, "y " + cy);
-        assertTrue(r.image().getHeight() > 80, "two lines");
+        assertTrue(Math.abs(cx - 300) < box.size() / 4, "x " + cx);
+        assertTrue(Math.abs(cy - 200) < box.size() / 4, "y " + cy);
+        assertTrue(r.image().getHeight() > 2 * box.size(), "two lines");
     }
 
     @Test
