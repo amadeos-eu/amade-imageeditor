@@ -56,6 +56,7 @@ public final class CropBox {
         return round(x, y, w, h, imageWidth, imageHeight);
     }
 
+    // --8<-- [start:drag]
     /**
      * Drags a handle of {@code start} by (dx, dy) picture pixels. Corners keep the ratio by following the larger
      * movement; edges grow the other side around the centre line; {@link Handle#MOVE} shifts the frame.
@@ -92,6 +93,7 @@ public final class CropBox {
         double y = handle.dy < 0 ? fy - h : handle.dy > 0 ? fy : fy - h / 2;
         return round(x, y, w, h, imageWidth, imageHeight);
     }
+    // --8<-- [end:drag]
 
     /** A new frame drawn from one corner to the other, in any direction. */
     public static Rectangle draw(double x1, double y1, double x2, double y2, double ratio,

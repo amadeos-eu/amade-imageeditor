@@ -38,6 +38,7 @@ public final class History {
         return current;
     }
 
+    // --8<-- [start:push]
     /** Applies a step; what could be redone is gone. */
     public BufferedImage push(Edit edit) {
         BufferedImage result = apply.apply(current, edit);
@@ -52,6 +53,7 @@ public final class History {
         current = result;
         return result;
     }
+    // --8<-- [end:push]
 
     public boolean canUndo() {
         return position > 0;
@@ -99,6 +101,7 @@ public final class History {
         savedAt = position;
     }
 
+    // --8<-- [start:only-turns]
     /**
      * The quarter turns and flips of all steps, if there are no other steps: then a JPEG can be saved without
      * loss by jpegtran.
@@ -111,7 +114,9 @@ public final class History {
         }
         return Optional.of(total);
     }
+    // --8<-- [end:only-turns]
 
+    // --8<-- [start:replay]
     private BufferedImage pictureAt(int index) {
         if (index == 0) return original;
         int start = index;
@@ -124,6 +129,7 @@ public final class History {
         }
         return picture;
     }
+    // --8<-- [end:replay]
 
     /** Drops every remembered picture except the original, as if memory had run short; for tests. */
     void forget() {

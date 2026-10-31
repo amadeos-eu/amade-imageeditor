@@ -312,6 +312,7 @@ public final class EditorCanvas extends JComponent {
         c.dispose();
     }
 
+    // --8<-- [start:look]
     /** The picture, with the adjusted look if {@code adjusted}. */
     private void paintPicture(Graphics2D g, Rectangle2D shown, boolean adjusted) {
         double s = scale();
@@ -345,6 +346,7 @@ public final class EditorCanvas extends JComponent {
                 (int) Math.round(at.getWidth()), (int) Math.round(at.getHeight()), null);
         q.dispose();
     }
+    // --8<-- [end:look]
 
     private BufferedImage scaledImage(double scale) {
         if (scaled != null && Math.abs(scaledFor - scale) < 1e-6) return scaled;
@@ -531,6 +533,7 @@ public final class EditorCanvas extends JComponent {
     }
 
     /** The degrees that make a line drawn on the screen level (or upright, if it is steeper than 45°). */
+    // --8<-- [start:levelling]
     static double levelling(double current, double x1, double y1, double x2, double y2) {
         double angle = Math.toDegrees(Math.atan2(y2 - y1, x2 - x1));
         // A line has no direction: bring it into -90..90, then steep lines count as vertical ones.
@@ -540,6 +543,7 @@ public final class EditorCanvas extends JComponent {
         else if (angle < -45) angle += 90;
         return Math.clamp(current - angle, -45, 45);
     }
+    // --8<-- [end:levelling]
 
     // ---------------------------------------------------------------- mouse
 

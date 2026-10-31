@@ -195,6 +195,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
                 : msg.format("error.save", target.getFileName(), e.getMessage())));
     }
 
+    // --8<-- [start:settled]
     /** Runs {@code then} once unsaved changes are saved or given up; not at all if the user cancels. */
     private void whenSettled(Runnable then) {
         if (history == null || !history.modified()) {
@@ -210,6 +211,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
             }
         }
     }
+    // --8<-- [end:settled]
 
     public void exit() {
         if (busy) return;
@@ -346,6 +348,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
         update();
     }
 
+    // --8<-- [start:apply-tool]
     @Override
     public void applyTool() {
         if (busy || history == null) return;
@@ -358,6 +361,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
         closeTool();
         edit.ifPresent(this::push);
     }
+    // --8<-- [end:apply-tool]
 
     // crop
 
@@ -458,6 +462,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
 
     // adjust
 
+    // --8<-- [start:adjust]
     @Override
     public void setAdjustments(Adjustments newAdjustments) {
         adjustments = newAdjustments;
@@ -465,6 +470,7 @@ public final class MainPresenter implements ToolPanel.Actions, EditorCanvas.List
         UnaryOperator<BufferedImage> look = shown.neutral() ? null : image -> ImageOperations.adjust(image, shown);
         view.showAdjust(shown, look);
     }
+    // --8<-- [end:adjust]
 
     @Override
     public void setCompare(boolean on) {
