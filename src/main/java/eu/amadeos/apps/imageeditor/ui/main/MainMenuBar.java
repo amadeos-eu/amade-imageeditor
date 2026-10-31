@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** File, Edit, Image, View, Options and Help. */
+/** File, Edit, Image, Layer, Tools, View, Options and Help. */
 public final class MainMenuBar extends JMenuBar {
     private static final int CTRL = InputEvent.CTRL_DOWN_MASK;
     private static final int SHIFT = InputEvent.SHIFT_DOWN_MASK;
@@ -48,6 +48,7 @@ public final class MainMenuBar extends JMenuBar {
         edit.add(item("menu.edit.redo", key(KeyEvent.VK_Y, CTRL), presenter::redo));
         edit.addSeparator();
         edit.add(item("menu.edit.copy", key(KeyEvent.VK_C, CTRL), presenter::copyImage));
+        edit.add(item("menu.edit.paste", key(KeyEvent.VK_V, CTRL), presenter::pasteAsLayer));
 
         JMenu image = menu("menu.image");
         image.add(check("menu.image.crop", key(KeyEvent.VK_K, CTRL), () -> presenter.selectTool(Tool.CROP)));
@@ -61,14 +62,51 @@ public final class MainMenuBar extends JMenuBar {
         image.add(item("menu.image.flip-horizontal", null, presenter::flipHorizontally));
         image.add(item("menu.image.flip-vertical", null, presenter::flipVertically));
 
+        JMenu layer = menu("menu.layer");
+        layer.add(item("menu.layer.new", key(KeyEvent.VK_N, CTRL | SHIFT), presenter::newLayer));
+        layer.add(item("menu.layer.duplicate", key(KeyEvent.VK_D, CTRL | SHIFT), presenter::duplicateLayer));
+        layer.add(item("menu.layer.picture", null, presenter::pictureAsLayer));
+        layer.add(item("menu.layer.paste", key(KeyEvent.VK_V, CTRL | SHIFT), presenter::pasteAsLayer));
+        layer.addSeparator();
+        layer.add(item("menu.layer.rename", key(KeyEvent.VK_F2, 0), presenter::renameLayer));
+        layer.add(item("menu.layer.up", key(KeyEvent.VK_PAGE_UP, CTRL), presenter::layerUp));
+        layer.add(item("menu.layer.down", key(KeyEvent.VK_PAGE_DOWN, CTRL), presenter::layerDown));
+        layer.addSeparator();
+        layer.add(item("menu.layer.merge-down", key(KeyEvent.VK_M, CTRL), presenter::mergeDown));
+        layer.add(item("menu.layer.flatten", null, presenter::flatten));
+        layer.addSeparator();
+        layer.add(item("menu.layer.delete", null, presenter::deleteLayer));
+
+        // The letters are shown in the tooltips and bound on the picture, not as accelerators here: an
+        // accelerator B would also fire while typing a text.
+        JMenu tools = menu("menu.tools");
+        tools.add(check("menu.tools.move", null, () -> presenter.selectTool(Tool.MOVE)));
+        tools.add(check("menu.tools.brush", null, () -> presenter.selectTool(Tool.BRUSH)));
+        tools.add(check("menu.tools.eraser", null, () -> presenter.selectTool(Tool.ERASER)));
+        tools.add(check("menu.tools.shapes", null, () -> presenter.selectTool(Tool.SHAPES)));
+        tools.add(check("menu.tools.text", null, () -> presenter.selectTool(Tool.TEXT)));
+        tools.add(check("menu.tools.fill", null, () -> presenter.selectTool(Tool.FILL)));
+        tools.add(check("menu.tools.pick", null, () -> presenter.selectTool(Tool.PICK)));
+        tools.addSeparator();
+        tools.add(item("menu.tools.swap", null, presenter::swapColours));
+        tools.add(item("menu.tools.default-colours", null, presenter::defaultColours));
+
         JMenu view = menu("menu.view");
         view.add(item("menu.view.zoom-in", key(KeyEvent.VK_PLUS, CTRL), () -> presenter.zoom(ZoomCommand.IN)));
         view.add(item("menu.view.zoom-out", key(KeyEvent.VK_MINUS, CTRL), () -> presenter.zoom(ZoomCommand.OUT)));
         view.add(item("menu.view.fit", key(KeyEvent.VK_0, CTRL), () -> presenter.zoom(ZoomCommand.FIT)));
         view.add(item("menu.view.actual", key(KeyEvent.VK_1, CTRL), () -> presenter.zoom(ZoomCommand.ACTUAL)));
+        view.addSeparator();
+        view.add(check("menu.view.layers", key(KeyEvent.VK_F7, 0), presenter::toggleLayersPanel));
 
+        JMenu options = menu("menu.options");
+        JCheckBoxMenuItem newLayer = check("menu.options.paint-new-layer", null, () -> {
+        });
+        newLayer.setSelected(presenter.paintOnNewLayer());
+        newLayer.addActionListener(e -> presenter.setPaintOnNewLayer(newLayer.isSelected()));
+        options.add(newLayer);
         if (locales != null) {
-            JMenu options = menu("menu.options");
+            options.addSeparator();
             options.add(languageMenu(presenter, locales));
         }
 
@@ -82,8 +120,16 @@ public final class MainMenuBar extends JMenuBar {
         boolean editable = picture && !busy;
         for (String key : List.of("menu.file.save", "menu.file.save-as", "menu.image.crop", "menu.image.straighten",
                 "menu.image.adjust", "menu.image.resize", "menu.image.auto-levels", "menu.image.rotate-left",
-                "menu.image.rotate-right", "menu.image.flip-horizontal", "menu.image.flip-vertical")) {
+                "menu.image.rotate-right", "menu.image.flip-horizontal", "menu.image.flip-vertical",
+                "menu.edit.paste", "menu.layer.new", "menu.layer.duplicate", "menu.layer.picture", "menu.layer.paste",
+                "menu.layer.rename", "menu.layer.up", "menu.layer.down", "menu.layer.merge-down", "menu.layer.flatten",
+                "menu.layer.delete")) {
             items.get(key).setEnabled(editable);
+        }
+        for (String key : List.of("menu.tools.move", "menu.tools.brush", "menu.tools.eraser", "menu.tools.shapes",
+                "menu.tools.text", "menu.tools.fill", "menu.tools.pick", "menu.tools.swap",
+                "menu.tools.default-colours")) {
+            items.get(key).setEnabled(picture);
         }
         for (String key : List.of("menu.edit.copy", "menu.view.zoom-in", "menu.view.zoom-out", "menu.view.fit",
                 "menu.view.actual")) {
@@ -110,6 +156,17 @@ public final class MainMenuBar extends JMenuBar {
         items.get("menu.image.crop").setSelected(tool == Tool.CROP);
         items.get("menu.image.straighten").setSelected(tool == Tool.STRAIGHTEN);
         items.get("menu.image.adjust").setSelected(tool == Tool.ADJUST);
+        items.get("menu.tools.move").setSelected(tool == Tool.MOVE);
+        items.get("menu.tools.brush").setSelected(tool == Tool.BRUSH);
+        items.get("menu.tools.eraser").setSelected(tool == Tool.ERASER);
+        items.get("menu.tools.shapes").setSelected(tool == Tool.SHAPES);
+        items.get("menu.tools.text").setSelected(tool == Tool.TEXT);
+        items.get("menu.tools.fill").setSelected(tool == Tool.FILL);
+        items.get("menu.tools.pick").setSelected(tool == Tool.PICK);
+    }
+
+    void showLayersPanel(boolean on) {
+        items.get("menu.view.layers").setSelected(on);
     }
 
     JMenuItem item(String name) {

@@ -1,8 +1,14 @@
 package eu.amadeos.apps.imageeditor.ui.main;
 
 import eu.amadeos.apps.imageeditor.domain.CropBox;
+import eu.amadeos.apps.imageeditor.domain.Dot;
+import eu.amadeos.apps.imageeditor.domain.PaintSettings;
+import eu.amadeos.apps.imageeditor.domain.ShapeKind;
+import eu.amadeos.apps.imageeditor.domain.TextBox;
 import eu.amadeos.apps.imageeditor.domain.ZoomSteps;
 import eu.amadeos.apps.imageeditor.service.ImageOperations;
+import eu.amadeos.apps.imageeditor.service.Painter;
+import eu.amadeos.apps.imageeditor.service.TextRenderer;
 
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
@@ -28,14 +34,19 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
+import java.awt.geom.Path2D;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.UnaryOperator;
 
 /**
  * Shows the picture being edited on a dark background, fitted or zoomed, with what the open tool draws over it:
- * the crop frame with its handles, the turned picture and its grid while straightening, or the adjusted picture,
- * optionally split against the original. The canvas only shows and reports; the presenter decides.
+ * the crop frame with its handles, the turned picture and its grid while straightening, the adjusted picture,
+ * optionally split against the original, the brush stroke being painted, the shape with its handles, the frame of
+ * the text being typed. The canvas only shows and reports; the presenter decides.
  */
 public final class EditorCanvas extends JComponent {
     /** What the canvas reports. */
@@ -48,6 +59,27 @@ public final class EditorCanvas extends JComponent {
 
         /** The shown scale changed, for the status bar. */
         void scaleChanged(double scale);
+
+        /** A brush or eraser stroke was painted through these points; {@code second} for the right button. */
+        void painted(List<Dot> dots, boolean second);
+
+        /** A shape was drawn or its handles moved; a freehand shape is reported once, when it is finished. */
+        void shapeChanged(List<Dot> dots, boolean second);
+
+        /** The shape with handles is finished: a new one begins elsewhere. */
+        void shapeDone();
+
+        /** A click with the Fill, Pick or Text tool. */
+        void clicked(Dot at, boolean second);
+
+        /** Alt+click with a painting tool: take the colour under the pointer. */
+        void picked(Dot at, boolean second);
+
+        /** The Move tool drags the layer this far (picture pixels); {@code done} when the button is released. */
+        void layerDragged(int dx, int dy, boolean done);
+
+        /** The open text's frame was dragged this far (picture pixels). */
+        void textDragged(double dx, double dy);
     }
 
     private static final Color BACKGROUND = new Color(0x2b2b2b);
@@ -81,6 +113,22 @@ public final class EditorCanvas extends JComponent {
 
     /** The line being drawn while straightening, in screen pixels. */
     private Line2D.Double levelLine;
+
+    private PaintSettings paint = PaintSettings.DEFAULT;
+    private List<Dot> pendingShape;
+    private boolean pendingSecond;
+    private TextBox text;
+    private Overlay overlay;
+    /** The stroke being painted, in picture pixels. */
+    private List<Dot> stroke;
+    private boolean strokeSecond;
+    /** Strokes painted but not yet in the picture: they stay on screen until the painted picture comes. */
+    private final List<List<Dot>> waiting = new ArrayList<>();
+    private final List<Boolean> waitingSecond = new ArrayList<>();
+    /** The end of the last stroke, for Shift+click straight lines. */
+    private Dot lastDot;
+    /** Where the pointer is, for the brush outline; null outside. */
+    private Point pointer;
 
     public EditorCanvas() {
         setOpaque(true);
@@ -118,6 +166,24 @@ public final class EditorCanvas extends JComponent {
         reportScale();
     }
 
+    /**
+     * A changed picture: one of the same size keeps the zoom and place, so that painting does not jump; another
+     * size is fitted like a new picture.
+     */
+    public void update(BufferedImage picture) {
+        if (image == null || picture.getWidth() != image.getWidth() || picture.getHeight() != image.getHeight()) {
+            show(picture);
+            return;
+        }
+        image = picture;
+        message = null;
+        scaled = null;
+        looked = null;
+        waiting.clear();
+        waitingSecond.clear();
+        repaint();
+    }
+
     public void showMessage(String text) {
         image = null;
         scaled = null;
@@ -134,13 +200,23 @@ public final class EditorCanvas extends JComponent {
     public void showTool(Tool newTool) {
         tool = newTool;
         levelLine = null;
+        stroke = null;
         if (tool != Tool.ADJUST) {
             look = null;
             split = -1;
             looked = null;
         }
-        setCursor(Cursor.getDefaultCursor());
+        setCursor(cursorForTool());
         repaint();
+    }
+
+    private Cursor cursorForTool() {
+        return Cursor.getPredefinedCursor(switch (tool) {
+            case BRUSH, ERASER, SHAPES, FILL, PICK -> Cursor.CROSSHAIR_CURSOR;
+            case TEXT -> Cursor.TEXT_CURSOR;
+            case MOVE -> Cursor.MOVE_CURSOR;
+            default -> Cursor.DEFAULT_CURSOR;
+        });
     }
 
     public void showCrop(Rectangle box, double ratio, Guides newGuides) {
@@ -166,6 +242,27 @@ public final class EditorCanvas extends JComponent {
     /** Shows the original left of the split and the adjusted picture right of it; false hides the split. */
     public void showCompare(boolean on) {
         split = on ? 0.5 : -1;
+        repaint();
+    }
+
+    public void showPaint(PaintSettings settings) {
+        paint = settings;
+        repaint();
+    }
+
+    public void showPendingShape(List<Dot> dots, boolean second) {
+        pendingShape = dots == null ? null : List.copyOf(dots);
+        pendingSecond = second;
+        repaint();
+    }
+
+    public void showText(TextBox draft) {
+        text = draft;
+        repaint();
+    }
+
+    public void showOverlay(Overlay newOverlay) {
+        overlay = newOverlay;
         repaint();
     }
 
@@ -290,6 +387,7 @@ public final class EditorCanvas extends JComponent {
             }
         }
         if (tool == Tool.CROP && crop != null) paintCrop(g, shown);
+        if (tool.paints()) paintPainting(g);
         g.dispose();
         reportScale();
         if (s < 1 && scaled == null) rescale.restart();
@@ -365,6 +463,98 @@ public final class EditorCanvas extends JComponent {
             lookedWith = look;
         }
         return looked;
+    }
+
+    // --8<-- [start:paint-overlay]
+    /**
+     * What the painting tools draw over the picture: the overlay (moved layer, typed text), the stroke being
+     * painted, the pending shape with its handles, the text frame and the brush outline. Strokes and shapes are
+     * drawn in picture pixels through the zoom, with the same code that paints them for real.
+     */
+    private void paintPainting(Graphics2D g) {
+        double s = scale();
+        Graphics2D p = (Graphics2D) g.create();
+        p.translate(originX(), originY());
+        p.scale(s, s);
+        p.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        if (overlay != null) overlay.paint((Graphics2D) p.create());
+        for (int i = 0; i < waiting.size(); i++) paintStroke(p, waiting.get(i), waitingSecond.get(i));
+        if (stroke != null && !stroke.isEmpty()) paintStroke(p, stroke, strokeSecond);
+        if (pendingShape != null && tool == Tool.SHAPES) {
+            Painter.drawShape(p, paint.shape(), pendingShape, paint.line(), paint.colour(pendingSecond),
+                    paint.fillColour(pendingSecond));
+        }
+        p.dispose();
+        if (pendingShape != null && tool == Tool.SHAPES && paint.shape().twoPoints()) {
+            for (Dot d : pendingShape.subList(0, 2)) handle(g, screen(d));
+        }
+        if (text != null && tool == Tool.TEXT) {
+            Point2D[] corners = TextRenderer.frame(text);
+            Path2D frame = new Path2D.Double();
+            for (int i = 0; i < corners.length; i++) {
+                Point2D c = screen(new Dot(corners[i].getX(), corners[i].getY()));
+                if (i == 0) frame.moveTo(c.getX(), c.getY());
+                else frame.lineTo(c.getX(), c.getY());
+            }
+            frame.closePath();
+            Graphics2D f = (Graphics2D) g.create();
+            f.setStroke(new BasicStroke(1.5f));
+            f.setColor(new Color(0, 0, 0, 160));
+            f.draw(frame);
+            f.setColor(Color.WHITE);
+            f.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1, new float[]{5, 4}, 0));
+            f.draw(frame);
+            f.dispose();
+            for (Point2D c : corners) handle(g, screen(new Dot(c.getX(), c.getY())));
+        }
+        if (pointer != null && (tool == Tool.BRUSH || tool == Tool.ERASER)) {
+            double d = Math.max(3, (tool == Tool.ERASER ? paint.eraser() : paint.brush()).size() * s);
+            Graphics2D o = (Graphics2D) g.create();
+            o.setStroke(new BasicStroke(1));
+            o.setColor(Color.BLACK);
+            o.draw(new Ellipse2D.Double(pointer.x - d / 2 - 1, pointer.y - d / 2 - 1, d + 2, d + 2));
+            o.setColor(Color.WHITE);
+            o.draw(new Ellipse2D.Double(pointer.x - d / 2, pointer.y - d / 2, d, d));
+            o.dispose();
+        }
+    }
+    // --8<-- [end:paint-overlay]
+
+    /** A stroke as it will look, roughly: the brush's width and colour, without its soft edge. */
+    private void paintStroke(Graphics2D p, List<Dot> dots, boolean second) {
+        boolean erase = tool == Tool.ERASER;
+        var brush = erase ? paint.eraser() : paint.brush();
+        Color c = erase ? new Color(128, 128, 128, 140) : paint.colour(second);
+        p.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(),
+                erase ? c.getAlpha() : (int) Math.round(255 * brush.opacity() / 100.0)));
+        p.setStroke(new BasicStroke(brush.size(), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        p.draw(polyline(dots));
+    }
+
+    private static Path2D polyline(List<Dot> dots) {
+        Path2D path = new Path2D.Double();
+        path.moveTo(dots.getFirst().x(), dots.getFirst().y());
+        for (Dot d : dots) path.lineTo(d.x(), d.y());
+        if (dots.size() == 1) path.lineTo(dots.getFirst().x() + 0.01, dots.getFirst().y());
+        return path;
+    }
+
+    private static void handle(Graphics2D g, Point2D at) {
+        int x = (int) Math.round(at.getX()), y = (int) Math.round(at.getY());
+        g.setStroke(new BasicStroke(1));
+        g.setColor(Color.WHITE);
+        g.fillRect(x - HANDLE / 2, y - HANDLE / 2, HANDLE, HANDLE);
+        g.setColor(Color.BLACK);
+        g.drawRect(x - HANDLE / 2, y - HANDLE / 2, HANDLE, HANDLE);
+    }
+
+    Point2D screen(Dot d) {
+        double s = scale();
+        return new Point2D.Double(originX() + d.x() * s, originY() + d.y() * s);
+    }
+
+    Dot dot(Point p) {
+        return new Dot(imageX(p.x), imageY(p.y));
     }
 
     private void paintCrop(Graphics2D g, Rectangle2D shown) {
@@ -547,6 +737,20 @@ public final class EditorCanvas extends JComponent {
 
     // ---------------------------------------------------------------- mouse
 
+    /** Where a shape's second point goes with Shift: lines in steps of 15°, boxes square. */
+    // --8<-- [start:constrain]
+    static Dot constrain(ShapeKind kind, Dot from, Dot to) {
+        double dx = to.x() - from.x(), dy = to.y() - from.y();
+        if (kind == ShapeKind.LINE || kind == ShapeKind.ARROW) {
+            double length = Math.hypot(dx, dy);
+            double angle = Math.round(Math.atan2(dy, dx) / Math.toRadians(15)) * Math.toRadians(15);
+            return new Dot(from.x() + length * Math.cos(angle), from.y() + length * Math.sin(angle));
+        }
+        double side = Math.max(Math.abs(dx), Math.abs(dy));
+        return new Dot(from.x() + Math.copySign(side, dx), from.y() + Math.copySign(side, dy));
+    }
+    // --8<-- [end:constrain]
+
     private final class Mouse extends MouseAdapter {
         private Point from;
         private Rectangle cropAtPress;
@@ -554,11 +758,34 @@ public final class EditorCanvas extends JComponent {
         private boolean drawing;
         private boolean panning;
         private boolean splitting;
+        private boolean second;
+        private boolean dragged;
+        /** Shapes: which point is dragged (0 or 1), -1 for the whole shape, -2 for a new shape. */
+        private int shapePoint;
+        private List<Dot> shapeAtPress;
+        private List<Dot> freehand;
+        private boolean textDragging;
+        private Dot textFrom;
 
         @Override
         public void mousePressed(MouseEvent e) {
             requestFocusInWindow();
-            if (image == null || !SwingUtilities.isLeftMouseButton(e)) return;
+            if (image == null) return;
+            boolean left = SwingUtilities.isLeftMouseButton(e), right = SwingUtilities.isRightMouseButton(e);
+            if (SwingUtilities.isMiddleMouseButton(e) && scrollable()) {
+                from = e.getPoint();
+                panning = true;
+                setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+                return;
+            }
+            if (tool.paints() && (left || right)) {
+                from = e.getPoint();
+                second = right;
+                dragged = false;
+                pressPainting(e);
+                return;
+            }
+            if (!left) return;
             from = e.getPoint();
             switch (tool) {
                 case CROP -> {
@@ -576,8 +803,57 @@ public final class EditorCanvas extends JComponent {
             if (panning) setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
         }
 
+        private void pressPainting(MouseEvent e) {
+            Dot at = dot(e.getPoint());
+            if (e.isAltDown() && tool != Tool.MOVE && tool != Tool.TEXT) {
+                if (listener != null) listener.picked(at, second);
+                from = null;
+                return;
+            }
+            switch (tool) {
+                case BRUSH, ERASER -> {
+                    stroke = new ArrayList<>();
+                    strokeSecond = second;
+                    // Shift+click: a straight line from where the last stroke ended.
+                    if (e.isShiftDown() && lastDot != null) stroke.add(lastDot);
+                    stroke.add(at);
+                    repaint();
+                }
+                case SHAPES -> pressShape(e, at);
+                case TEXT -> {
+                    textDragging = text != null && TextRenderer.hits(text, at.x(), at.y());
+                    textFrom = at;
+                }
+                default -> {
+                }
+            }
+        }
+
+        private void pressShape(MouseEvent e, Dot at) {
+            freehand = null;
+            if (paint.shape() == ShapeKind.FREEHAND) {
+                if (pendingShape != null && listener != null) listener.shapeDone();
+                freehand = new ArrayList<>(List.of(at));
+                stroke = null;
+                return;
+            }
+            shapePoint = -2;
+            if (pendingShape != null) {
+                for (int i = 0; i < 2; i++) {
+                    if (screen(pendingShape.get(i)).distance(e.getPoint()) <= HANDLE) shapePoint = i;
+                }
+                if (shapePoint == -2 && Painter.outline(paint.shape(), pendingShape, paint.line().width())
+                        .getBounds2D().contains(at.x(), at.y())) {
+                    shapePoint = -1;
+                }
+                if (shapePoint == -2 && listener != null) listener.shapeDone();
+            }
+            shapeAtPress = shapePoint == -2 ? List.of(at, at) : pendingShape;
+        }
+
         @Override
         public void mouseDragged(MouseEvent e) {
+            pointer = e.getPoint();
             if (from == null || image == null) return;
             if (panning) {
                 double s = scale();
@@ -586,6 +862,11 @@ public final class EditorCanvas extends JComponent {
                 from = e.getPoint();
                 clampCentre();
                 repaint();
+                return;
+            }
+            if (tool.paints()) {
+                if (e.getPoint().distance(from) >= 2) dragged = true;
+                dragPainting(e);
                 return;
             }
             switch (tool) {
@@ -620,6 +901,54 @@ public final class EditorCanvas extends JComponent {
             }
         }
 
+        private void dragPainting(MouseEvent e) {
+            Dot at = dot(e.getPoint());
+            double s = scale();
+            switch (tool) {
+                case BRUSH, ERASER -> {
+                    if (stroke == null) return;
+                    Dot last = stroke.getLast();
+                    if (Math.hypot(at.x() - last.x(), at.y() - last.y()) * s >= 1) stroke.add(at);
+                    repaint();
+                }
+                case SHAPES -> {
+                    if (freehand != null) {
+                        Dot last = freehand.getLast();
+                        if (Math.hypot(at.x() - last.x(), at.y() - last.y()) * s >= 1) freehand.add(at);
+                        stroke = null;
+                        showPendingShape(freehand, second);
+                        return;
+                    }
+                    if (shapeAtPress == null || !dragged) return;
+                    Dot a = shapeAtPress.get(0), b = shapeAtPress.get(1);
+                    List<Dot> moved = switch (shapePoint) {
+                        case 0 -> List.of(e.isShiftDown() ? constrain(paint.shape(), b, at) : at, b);
+                        case 1 -> List.of(a, e.isShiftDown() ? constrain(paint.shape(), a, at) : at);
+                        case -1 -> {
+                            double dx = (e.getX() - from.x) / s, dy = (e.getY() - from.y) / s;
+                            yield List.of(new Dot(a.x() + dx, a.y() + dy), new Dot(b.x() + dx, b.y() + dy));
+                        }
+                        default -> List.of(a, e.isShiftDown() ? constrain(paint.shape(), a, at) : at);
+                    };
+                    if (listener != null) listener.shapeChanged(moved, shapePoint == -2 ? second : pendingSecond);
+                }
+                case MOVE -> {
+                    if (listener != null) {
+                        listener.layerDragged((int) Math.round((e.getX() - from.x) / s),
+                                (int) Math.round((e.getY() - from.y) / s), false);
+                    }
+                }
+                case TEXT -> {
+                    if (textDragging && listener != null) {
+                        listener.textDragged(at.x() - textFrom.x(), at.y() - textFrom.y());
+                        textFrom = at;
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+
         @Override
         public void mouseReleased(MouseEvent e) {
             if (tool == Tool.STRAIGHTEN && levelLine != null) {
@@ -630,21 +959,75 @@ public final class EditorCanvas extends JComponent {
                     listener.levelLine(levelling(degrees, line.x1, line.y1, line.x2, line.y2));
                 }
             }
+            if (tool.paints() && from != null && !panning) releasePainting(e);
             from = null;
             panning = false;
             splitting = false;
             drawing = false;
-            setCursor(tool == Tool.CROP ? cursorFor(handleAt(e.getPoint())) : Cursor.getDefaultCursor());
+            setCursor(tool == Tool.CROP ? cursorFor(handleAt(e.getPoint())) : cursorForTool());
+        }
+
+        private void releasePainting(MouseEvent e) {
+            Dot at = dot(e.getPoint());
+            double s = scale();
+            switch (tool) {
+                case BRUSH, ERASER -> {
+                    if (stroke == null) return;
+                    List<Dot> dots = List.copyOf(stroke);
+                    lastDot = dots.getLast();
+                    // The stroke stays on screen until the presenter shows the painted picture.
+                    waiting.add(dots);
+                    waitingSecond.add(strokeSecond);
+                    stroke = null;
+                    if (listener != null) listener.painted(dots, strokeSecond);
+                }
+                case SHAPES -> {
+                    if (freehand != null) {
+                        List<Dot> dots = List.copyOf(freehand);
+                        freehand = null;
+                        if (listener != null) listener.shapeChanged(dots, second);
+                    }
+                    shapeAtPress = null;
+                }
+                case MOVE -> {
+                    if (listener != null) {
+                        listener.layerDragged((int) Math.round((e.getX() - from.x) / s),
+                                (int) Math.round((e.getY() - from.y) / s), true);
+                    }
+                }
+                case TEXT -> {
+                    if (!dragged && listener != null) listener.clicked(at, second);
+                    textDragging = false;
+                }
+                case FILL, PICK -> {
+                    if (!dragged && listener != null) listener.clicked(at, second);
+                }
+                default -> {
+                }
+            }
+            repaint();
         }
 
         @Override
         public void mouseMoved(MouseEvent e) {
             if (image == null) return;
+            pointer = e.getPoint();
             if (tool == Tool.CROP) setCursor(cursorFor(handleAt(e.getPoint())));
             else if (tool == Tool.STRAIGHTEN) setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
             else if (tool == Tool.ADJUST && split >= 0 && Math.abs(e.getX() - splitX()) <= 10) {
                 setCursor(Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR));
-            } else setCursor(Cursor.getDefaultCursor());
+            } else if (tool == Tool.TEXT && text != null) {
+                Dot at = dot(e.getPoint());
+                setCursor(Cursor.getPredefinedCursor(TextRenderer.hits(text, at.x(), at.y())
+                        ? Cursor.MOVE_CURSOR : Cursor.TEXT_CURSOR));
+            } else setCursor(cursorForTool());
+            if (tool == Tool.BRUSH || tool == Tool.ERASER) repaint();
+        }
+
+        @Override
+        public void mouseExited(MouseEvent e) {
+            pointer = null;
+            if (tool == Tool.BRUSH || tool == Tool.ERASER) repaint();
         }
 
         @Override

@@ -45,7 +45,7 @@ import java.util.function.IntConsumer;
  */
 public final class ToolPanel extends JPanel {
     /** What the panel asks of the presenter. */
-    public interface Actions {
+    public interface Actions extends PaintPanels.Actions {
         void setRatio(AspectRatio ratio);
 
         void customRatio();
@@ -81,6 +81,7 @@ public final class ToolPanel extends JPanel {
 
     private final Messages msg;
     private final Actions actions;
+    private final PaintPanels paint;
     private final CardLayout cards = new CardLayout();
     private boolean updating;
 
@@ -116,6 +117,14 @@ public final class ToolPanel extends JPanel {
         add(withButtons(cropPanel(), "tool.cancel"), Tool.CROP.name());
         add(withButtons(straightenPanel(), "tool.cancel"), Tool.STRAIGHTEN.name());
         add(withButtons(adjustPanel(), "tool.reset"), Tool.ADJUST.name());
+        paint = new PaintPanels(msg, actions);
+        add(paint.move(), Tool.MOVE.name());
+        add(paint.brush(), Tool.BRUSH.name());
+        add(paint.eraser(), Tool.ERASER.name());
+        add(paint.shapes(), Tool.SHAPES.name());
+        add(paint.text(), Tool.TEXT.name());
+        add(paint.fill(), Tool.FILL.name());
+        add(paint.pick(), Tool.PICK.name());
         setPreferredSize(new Dimension(Math.round(250 * AmadeUI.fontScale()), 10));
         setVisible(false);
     }
@@ -123,6 +132,7 @@ public final class ToolPanel extends JPanel {
     /** Opens the panel of a tool, or hides the panel for {@link Tool#NONE}. */
     public void showTool(Tool newTool) {
         tool = newTool;
+        paint.showTool(newTool);
         cards.show(this, newTool.name());
         setVisible(newTool != Tool.NONE);
         if (newTool == Tool.ADJUST) {
@@ -478,6 +488,11 @@ public final class ToolPanel extends JPanel {
         c.setAlignmentX(0);
         c.setMaximumSize(new Dimension(Integer.MAX_VALUE, c.getPreferredSize().height));
         return c;
+    }
+
+    /** The panels of the painting tools. */
+    PaintPanels paint() {
+        return paint;
     }
 
     // ---------------------------------------------------------------- for tests

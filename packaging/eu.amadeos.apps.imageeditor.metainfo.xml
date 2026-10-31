@@ -12,11 +12,11 @@
   <name xml:lang="es">amadeOS Editor de imágenes</name>
   <name xml:lang="it">amadeOS Editor di immagini</name>
 
-  <summary>Crop, straighten, resize and adjust photos</summary>
-  <summary xml:lang="de">Fotos zuschneiden, begradigen, verkleinern und anpassen</summary>
-  <summary xml:lang="fr">Recadrer, redresser, redimensionner et ajuster des photos</summary>
-  <summary xml:lang="es">Recortar, enderezar, redimensionar y ajustar fotos</summary>
-  <summary xml:lang="it">Ritagliare, raddrizzare, ridimensionare e regolare foto</summary>
+  <summary>Crop, adjust and paint on photos, with text and layers</summary>
+  <summary xml:lang="de">Fotos zuschneiden, anpassen und bemalen, mit Text und Ebenen</summary>
+  <summary xml:lang="fr">Recadrer, ajuster et peindre sur des photos, avec texte et calques</summary>
+  <summary xml:lang="es">Recortar, ajustar y pintar sobre fotos, con texto y capas</summary>
+  <summary xml:lang="it">Ritagliare, regolare e dipingere su foto, con testo e livelli</summary>
 
   <description>
     <p>amade-imageeditor is the image editor of the amadeOS desktop. It does the everyday work on photos and pictures: cut out the part that matters, turn a crooked horizon level, make a picture smaller for mail or the web, and correct light and colours.</p>
@@ -35,16 +35,21 @@
       <li xml:lang="fr">Redimensionner, luminosité, contraste, saturation, chaleur, niveaux de gris et niveaux automatiques, avec vue avant et après</li>
       <li xml:lang="es">Cambiar tamaño, brillo, contraste, saturación, calidez, escala de grises y niveles automáticos, con vista de antes y después</li>
       <li xml:lang="it">Ridimensionare, luminosità, contrasto, saturazione, calore, scala di grigi e livelli automatici, con vista prima e dopo</li>
+      <li>Brush, eraser, arrows and shapes, fill and text with outline, shadow or box, each on layers that stay editable; OpenRaster files keep the layers</li>
+      <li xml:lang="de">Pinsel, Radierer, Pfeile und Formen, Füllen und Text mit Kontur, Schatten oder Kasten, jeweils auf Ebenen, die bearbeitbar bleiben; OpenRaster-Dateien behalten die Ebenen</li>
+      <li xml:lang="fr">Pinceau, gomme, flèches et formes, remplissage et texte avec contour, ombre ou cadre, sur des calques qui restent modifiables ; les fichiers OpenRaster gardent les calques</li>
+      <li xml:lang="es">Pincel, borrador, flechas y formas, relleno y texto con contorno, sombra o recuadro, en capas que siguen siendo editables; los archivos OpenRaster conservan las capas</li>
+      <li xml:lang="it">Pennello, gomma, frecce e forme, riempimento e testo con contorno, ombra o riquadro, su livelli che restano modificabili; i file OpenRaster mantengono i livelli</li>
       <li>Unlimited undo; the original stays unchanged until you save</li>
       <li xml:lang="de">Unbegrenztes Rückgängig; das Original bleibt bis zum Speichern unverändert</li>
       <li xml:lang="fr">Annulation illimitée ; l'original reste inchangé jusqu'à l'enregistrement</li>
       <li xml:lang="es">Deshacer sin límite; el original no cambia hasta que se guarda</li>
       <li xml:lang="it">Annullamento illimitato; l'originale resta invariato fino al salvataggio</li>
-      <li>Saves JPEG, PNG, TIFF, WebP and BMP; keeps the camera data, location, title and keywords of JPEGs; quarter turns of JPEGs without loss</li>
-      <li xml:lang="de">Speichert JPEG, PNG, TIFF, WebP und BMP; behält Kameradaten, Aufnahmeort, Titel und Stichwörter von JPEGs; Vierteldrehungen von JPEGs ohne Verlust</li>
-      <li xml:lang="fr">Enregistre en JPEG, PNG, TIFF, WebP et BMP ; garde les données de l'appareil, le lieu, le titre et les mots-clés des JPEG ; quarts de tour des JPEG sans perte</li>
-      <li xml:lang="es">Guarda JPEG, PNG, TIFF, WebP y BMP; conserva los datos de la cámara, la ubicación, el título y las palabras clave de los JPEG; giros de un cuarto de JPEG sin pérdida</li>
-      <li xml:lang="it">Salva JPEG, PNG, TIFF, WebP e BMP; mantiene dati della fotocamera, luogo, titolo e parole chiave dei JPEG; quarti di giro dei JPEG senza perdita</li>
+      <li>Saves JPEG, PNG, TIFF, WebP, BMP and OpenRaster; keeps the camera data, location, title and keywords of JPEGs; quarter turns of JPEGs without loss</li>
+      <li xml:lang="de">Speichert JPEG, PNG, TIFF, WebP, BMP und OpenRaster; behält Kameradaten, Aufnahmeort, Titel und Stichwörter von JPEGs; Vierteldrehungen von JPEGs ohne Verlust</li>
+      <li xml:lang="fr">Enregistre en JPEG, PNG, TIFF, WebP, BMP et OpenRaster ; garde les données de l'appareil, le lieu, le titre et les mots-clés des JPEG ; quarts de tour des JPEG sans perte</li>
+      <li xml:lang="es">Guarda JPEG, PNG, TIFF, WebP, BMP y OpenRaster; conserva los datos de la cámara, la ubicación, el título y las palabras clave de los JPEG; giros de un cuarto de JPEG sin pérdida</li>
+      <li xml:lang="it">Salva JPEG, PNG, TIFF, WebP, BMP e OpenRaster; mantiene dati della fotocamera, luogo, titolo e parole chiave dei JPEG; quarti di giro dei JPEG senza perdita</li>
     </ul>
   </description>
 
@@ -78,6 +83,14 @@
       <caption xml:lang="es">Ajustar la luz y los colores, comparado con el original</caption>
       <caption xml:lang="it">Regolare luce e colori, a confronto con l'originale</caption>
       <image>https://raw.githubusercontent.com/amadeos-eu/amade-imageeditor/main/docs/screenshots/amade-imageeditor-adjust.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>An arrow, a circle and a text on layers of their own</caption>
+      <caption xml:lang="de">Ein Pfeil, ein Kreis und ein Text auf eigenen Ebenen</caption>
+      <caption xml:lang="fr">Une flèche, un cercle et un texte sur leurs propres calques</caption>
+      <caption xml:lang="es">Una flecha, un círculo y un texto en capas propias</caption>
+      <caption xml:lang="it">Una freccia, un cerchio e un testo su livelli propri</caption>
+      <image>https://raw.githubusercontent.com/amadeos-eu/amade-imageeditor/main/docs/screenshots/amade-imageeditor-paint.png</image>
     </screenshot>
   </screenshots>
 

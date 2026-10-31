@@ -40,6 +40,7 @@ public final class SavePanel extends JPanel {
     private final Function<ImageFormat, SaveOptions> remembered;
     private final Path original;
     private final boolean fromJpeg;
+    private final boolean layered;
     private Path folder;
     private final JLabel folderLabel = new JLabel();
     private final JTextField name = new JTextField(18);
@@ -63,6 +64,13 @@ public final class SavePanel extends JPanel {
      */
     public SavePanel(Messages msg, Path target, Path original, boolean fromJpeg,
                      Function<ImageFormat, SaveOptions> remembered) {
+        this(msg, target, original, fromJpeg, false, remembered);
+    }
+
+    /** @param layered true if the picture has layers, which all formats but OpenRaster merge */
+    public SavePanel(Messages msg, Path target, Path original, boolean fromJpeg, boolean layered,
+                     Function<ImageFormat, SaveOptions> remembered) {
+        this.layered = layered;
         this.msg = msg;
         this.remembered = remembered;
         this.original = original;
@@ -186,8 +194,11 @@ public final class SavePanel extends JPanel {
         lossless.setVisible(f == ImageFormat.WEBP);
         lossless.setSelected(f == ImageFormat.WEBP && options.lossless());
         quality.setEnabled(!lossless.isSelected());
-        formatNote.setText(f == ImageFormat.WEBP ? small(msg.get("save.webp-note"))
-                : f == ImageFormat.TIFF ? small(msg.get("save.tiff-note")) : "");
+        String note = f == ImageFormat.WEBP ? msg.get("save.webp-note")
+                : f == ImageFormat.TIFF ? msg.get("save.tiff-note")
+                : f == ImageFormat.ORA ? msg.get("save.ora-note") : "";
+        if (layered && !f.layers()) note = (note.isEmpty() ? "" : note + " ") + msg.get("save.layers-merged");
+        formatNote.setText(note.isEmpty() ? "" : small(note));
         formatNote.setVisible(!formatNote.getText().isEmpty());
         keepCamera.setSelected(options.keepCamera());
         keepLocation.setSelected(options.keepLocation());

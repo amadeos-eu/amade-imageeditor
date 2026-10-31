@@ -30,17 +30,26 @@ class TranslationTest {
     /** No two entries share a mnemonic letter in the menu bar or in one menu. */
     @Test
     void mnemonicsAreUnique() {
-        Map<String, List<String>> groups = Map.of(
-                "bar", List.of("menu.file", "menu.edit", "menu.image", "menu.view", "menu.options", "menu.help"),
-                "file", List.of("menu.file.open", "menu.file.save", "menu.file.save-as", "menu.file.exit"),
-                "edit", List.of("menu.edit.undo", "menu.edit.redo", "menu.edit.copy"),
-                "edit-steps", List.of("menu.edit.undo.step", "menu.edit.redo.step", "menu.edit.copy"),
-                "image", List.of("menu.image.crop", "menu.image.straighten", "menu.image.adjust",
+        Map<String, List<String>> groups = Map.ofEntries(
+                Map.entry("bar", List.of("menu.file", "menu.edit", "menu.image", "menu.layer", "menu.tools",
+                        "menu.view", "menu.options", "menu.help")),
+                Map.entry("file", List.of("menu.file.open", "menu.file.save", "menu.file.save-as", "menu.file.exit")),
+                Map.entry("edit", List.of("menu.edit.undo", "menu.edit.redo", "menu.edit.copy", "menu.edit.paste")),
+                Map.entry("edit-steps", List.of("menu.edit.undo.step", "menu.edit.redo.step", "menu.edit.copy",
+                        "menu.edit.paste")),
+                Map.entry("image", List.of("menu.image.crop", "menu.image.straighten", "menu.image.adjust",
                         "menu.image.resize", "menu.image.auto-levels", "menu.image.rotate-left",
-                        "menu.image.rotate-right", "menu.image.flip-horizontal", "menu.image.flip-vertical"),
-                "view", List.of("menu.view.zoom-in", "menu.view.zoom-out", "menu.view.fit", "menu.view.actual"),
-                "options", List.of("menu.options.language"),
-                "help", List.of("menu.help.about"));
+                        "menu.image.rotate-right", "menu.image.flip-horizontal", "menu.image.flip-vertical")),
+                Map.entry("layer", List.of("menu.layer.new", "menu.layer.duplicate", "menu.layer.picture",
+                        "menu.layer.paste", "menu.layer.rename", "menu.layer.up", "menu.layer.down",
+                        "menu.layer.merge-down", "menu.layer.flatten", "menu.layer.delete")),
+                Map.entry("tools", List.of("menu.tools.move", "menu.tools.brush", "menu.tools.eraser",
+                        "menu.tools.shapes", "menu.tools.text", "menu.tools.fill", "menu.tools.pick",
+                        "menu.tools.swap", "menu.tools.default-colours")),
+                Map.entry("view", List.of("menu.view.zoom-in", "menu.view.zoom-out", "menu.view.fit",
+                        "menu.view.actual", "menu.view.layers")),
+                Map.entry("options", List.of("menu.options.language", "menu.options.paint-new-layer")),
+                Map.entry("help", List.of("menu.help.about")));
         for (Language language : Language.values()) {
             Messages texts = texts(language);
             for (Map.Entry<String, List<String>> group : groups.entrySet()) {

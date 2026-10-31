@@ -30,7 +30,13 @@ public final class ImageEditorModule extends AbstractModule {
     @Override
     protected void configure() {
         bind(EditorPreferences.class).in(Scopes.SINGLETON);
-        bind(ImageLoader.class).in(Scopes.SINGLETON);
+    }
+
+    /** The loader names the one layer of an opened photo in the user's language. */
+    @Provides
+    @Singleton
+    ImageLoader loader(Messages msg) {
+        return new ImageLoader(msg.get("layer.background"));
     }
 
     /** The texts in the language {@code AmadeApplication} chose. */

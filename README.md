@@ -1,6 +1,6 @@
 # amade-imageeditor
 
-**amade-imageeditor** is the image editor of the [amadeOS](https://github.com/amadeos-eu/amadeos) desktop: it crops, turns, straightens, resizes and corrects the colours of a photo, with unlimited undo, and saves it as JPEG, PNG, WebP, TIFF or BMP. Built like the other amadeOS applications.
+**amade-imageeditor** is the image editor of the [amadeOS](https://github.com/amadeos-eu/amadeos) desktop: it crops, turns, straightens, resizes and corrects the colours of a photo, paints on it, writes text and arrows on it, works with layers, has unlimited undo, and saves it as JPEG, PNG, WebP, TIFF, BMP or, with its layers, as OpenRaster. Built like the other amadeOS applications.
 
 ![License](https://img.shields.io/badge/license-EUPL--1.2-blue)
 ![Java](https://img.shields.io/badge/Java-25-orange)
@@ -17,6 +17,14 @@
 - **Resize** (Ctrl+E): width and height in pixels or percent, keeping the ratio, with presets (3840, 1920, 1280, 1024, 800 px on the long side, 50 %) and three quality levels.
 
   ![Adjust colours](docs/screenshots/amade-imageeditor-adjust.png)
+- **Painting tools** (letters as in other editors): *Brush* (B) with size, hardness and opacity, *Eraser* (E), *Shapes* (U: line, arrow, rectangle, ellipse, rounded box, freehand; solid, dashed or dotted, empty or filled), *Fill* (G) with a tolerance, *Pick colour* (I, or Alt+click). The left button paints in the first colour, the right one in the second; X swaps them, D resets black and white, [ and ] change the brush size. A shape keeps its handles until the next one begins, so it can still be moved and changed.
+
+  ![Painting on a layer of its own](docs/screenshots/amade-imageeditor-paint.png)
+- **Text** (T): click into the picture and type; font, size, bold, italic, alignment, colour and an outline, shadow or box behind it. Every text is a layer of its own and stays text: click it again to change it, drag it, and cropping, turning, straightening and resizing move and turn it without making pixels of it.
+
+  ![Text on a box](docs/screenshots/amade-imageeditor-text.png)
+- **Layers** (*Layer* menu and the Layers panel, F7): new, duplicate, picture from a file or the clipboard as a layer (Ctrl+V), rename, order, hide, opacity, merge down, flatten, delete; *Move* (V, arrow keys) shifts a layer. Painting on a photo goes on a new layer *Painting* above it, so the photo stays as it was (*Options → Paint on a New Layer*). Crop, turn, straighten and resize work on all layers; Adjust Colours and Auto Levels on the active one.
+- **OpenRaster** (`.ora`) keeps the layers and the texts: the open format GIMP, Krita and MyPaint read and write too. Saving a picture with layers as JPEG or PNG merges it, after asking once, and can keep an `.ora` copy next to it.
 - **Unlimited undo and redo** (Ctrl+Z, Ctrl+Y); the menu names the step (*Undo Crop*).
 - **Save** (Ctrl+S) and **Save As** (Ctrl+Shift+S) with format, JPEG and WebP quality and lossless WebP. *Save* writes back into the opened file; *Save As* says whether the chosen name replaces the original or keeps it. Files are written to a temporary name first and then moved into place, so a failed save never leaves half a picture.
 - **Metadata** from JPEG to JPEG: camera data, the description (XMP, IPTC) and the location are kept, each can be switched off; *Keep location (GPS)* is on by default. The orientation is set to upright, the size corrected and the old preview picture removed, so no other program shows the uncropped photo.
@@ -33,12 +41,12 @@ Java 25, Swing and Guice; start-up, theme and language come from `AmadeApplicati
 | Package | Contents |
 |---|---|
 | `bootstrap` | `AmadeImageEditorApplication`, `ImageEditorModule` |
-| `domain` | `Edit` (crop, turn, straighten, resize, adjust, auto levels), `History` (undo and redo), `CropBox`, `AspectRatio`, `Adjustments`, `ImageFormat`, `SaveOptions`, `ResizeQuality`, `Orientation`, `ZoomSteps` |
-| `repository` | `EditorPreferences` (`~/.config/amadeos/imageeditor/imageeditor.properties`: save settings per format, resize quality, last folder) |
-| `service` | `ImageLoader`, `ImageOperations` (the edits on pixels), `ImageSaver` (formats, `jpegtran`, `cwebp`, atomic writes), `JpegMetadata` (EXIF, XMP and IPTC from the original into the new JPEG) |
-| `ui.main` | window, presenter, menus, `EditorCanvas` (picture, crop frame, level line, comparison), `ToolPanel`, `ResizePanel`, `SavePanel` |
+| `domain` | `Picture` and `Layer` (the document, immutable), `Edit` (crop, turn, straighten, resize, adjust, auto levels, strokes, shapes, fill, text and the layer commands), `History` (undo and redo), `TextBox`, `Brush`, `LineStyle`, `PaintSettings`, `CropBox`, `AspectRatio`, `Adjustments`, `ImageFormat`, `SaveOptions`, `ResizeQuality`, `Orientation`, `ZoomSteps` |
+| `repository` | `EditorPreferences` (`~/.config/amadeos/imageeditor/imageeditor.properties`: save settings per format, resize quality, colours, brush and shape settings, last folder) |
+| `service` | `ImageLoader`, `ImageOperations` (the edits on pixels), `PictureOperations` (every edit on a picture with layers), `Painter` (brush, shapes, fill), `TextRenderer`, `OpenRaster` (.ora), `ImageSaver` (formats, `jpegtran`, `cwebp`, atomic writes), `JpegMetadata` (EXIF, XMP and IPTC from the original into the new JPEG) |
+| `ui.main` | window, presenter, menus, `EditorCanvas` (picture, crop frame, level line, comparison, strokes, shape handles, text frame), `ToolPanel`, `PaintPanels`, `LayersPanel`, `ColourPair`, `ResizePanel`, `SavePanel` |
 
-Every edit is a value in the history. The picture after each step is kept as long as memory allows; otherwise it is computed again from the original. The presenter knows the window only through the `MainView` interface, so the tests drive the whole editor (tools, undo, save, unsaved changes) without Swing.
+Every edit is a value in the history, a brush stroke too (its points, brush and colour). The picture after each step is kept as long as memory allows; otherwise it is computed again from the original. The presenter knows the window only through the `MainView` interface, so the tests drive the whole editor (tools, undo, save, unsaved changes) without Swing.
 
 ## Build and run
 
@@ -54,7 +62,7 @@ If `../amade-commons` is checked out next to this repository, Gradle builds agai
 ## Planned
 
 - *Edit* in the image viewer opens the picture here
-- Painting, text and shapes; layers
+- Selections (a part of the picture to paint in, copy or move), blend modes and layer masks
 - Red-eye removal, sharpening, blur
 - Writing the title, caption and keywords
 

@@ -10,7 +10,9 @@ import javax.swing.JComponent;
 import javax.swing.KeyStroke;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -108,6 +110,66 @@ class MainWindowTest {
         OnEdt.run(() -> {
             window.toolAction("image.rotate-right").actionPerformed(null);
             assertTrue(window.statusText().startsWith("300 × 400"), window.statusText());
+        });
+    }
+
+    private void canvasKey(int code) throws Exception {
+        OnEdt.run(() -> {
+            var canvas = window.canvas();
+            Object name = canvas.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke(code, 0));
+            canvas.getActionMap().get(name).actionPerformed(new ActionEvent(canvas, 0, ""));
+        });
+    }
+
+    private void drag(int x1, int y1, int x2, int y2) throws Exception {
+        OnEdt.run(() -> {
+            var c = window.canvas();
+            long t = System.currentTimeMillis();
+            c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_PRESSED, t, InputEvent.BUTTON1_DOWN_MASK, x1, y1, 1,
+                    false, MouseEvent.BUTTON1));
+            c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_DRAGGED, t + 10, InputEvent.BUTTON1_DOWN_MASK,
+                    (x1 + x2) / 2, (y1 + y2) / 2, 0, false, MouseEvent.NOBUTTON));
+            c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_DRAGGED, t + 20, InputEvent.BUTTON1_DOWN_MASK, x2, y2,
+                    0, false, MouseEvent.NOBUTTON));
+            c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_RELEASED, t + 30, 0, x2, y2, 1, false,
+                    MouseEvent.BUTTON1));
+        });
+    }
+
+    @Test
+    void paintsWithTheBrushOnANewLayer() throws Exception {
+        open();
+        canvasKey(KeyEvent.VK_B);
+        OnEdt.run(() -> {
+            assertEquals(Tool.BRUSH, presenter.tool());
+            assertTrue(window.toolButton(Tool.BRUSH).isSelected());
+            assertTrue(window.menu().item("menu.tools.brush").isSelected());
+            assertEquals(1, window.layersPanel().layerList().getModel().getSize());
+        });
+        int cx = window.canvas().getWidth() / 2, cy = window.canvas().getHeight() / 2;
+        drag(cx - 40, cy, cx + 40, cy);
+        OnEdt.run(() -> {
+            assertEquals(2, window.layersPanel().layerList().getModel().getSize(), "a Painting layer");
+            assertTrue(window.menu().item("menu.edit.undo").getText().contains("Brush"),
+                    window.menu().item("menu.edit.undo").getText());
+            assertTrue(window.menu().item("menu.layer.flatten").isEnabled());
+            window.menu().item("menu.layer.flatten").doClick(0);
+            assertEquals(1, window.layersPanel().layerList().getModel().getSize());
+        });
+        canvasKey(KeyEvent.VK_CLOSE_BRACKET);
+        OnEdt.run(() -> assertTrue(presenter.paint().brush().size() > 24));
+    }
+
+    @Test
+    void textToolShowsItsPanel() throws Exception {
+        open();
+        OnEdt.run(() -> {
+            window.toolButton(Tool.TEXT).doClick(0);
+            assertEquals(Tool.TEXT, window.toolPanel().tool());
+            presenter.clicked(new eu.amadeos.apps.imageeditor.domain.Dot(200, 150), false);
+            window.toolPanel().paint().textArea().setText("Hello");
+            presenter.finishText();
+            assertEquals(2, window.layersPanel().layerList().getModel().getSize());
         });
     }
 }

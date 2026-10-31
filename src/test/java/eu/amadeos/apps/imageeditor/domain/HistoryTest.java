@@ -18,11 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HistoryTest {
     /** A fake step: each edit makes the picture one pixel narrower, and counts how often it ran. */
     private final List<Edit> applied = new ArrayList<>();
-    private final BiFunction<BufferedImage, Edit, BufferedImage> narrower = (image, edit) -> {
+    private final BiFunction<Picture, Edit, Picture> narrower = (picture, edit) -> {
         applied.add(edit);
-        return new BufferedImage(image.getWidth() - 1, image.getHeight(), BufferedImage.TYPE_INT_RGB);
+        return Picture.of(new BufferedImage(picture.width() - 1, picture.height(), BufferedImage.TYPE_INT_RGB),
+                "Background");
     };
-    private final BufferedImage original = new BufferedImage(10, 5, BufferedImage.TYPE_INT_RGB);
+    private final Picture original = Picture.of(new BufferedImage(10, 5, BufferedImage.TYPE_INT_RGB), "Background");
 
     private static Edit crop() {
         return new Edit.Crop(new Rectangle(0, 0, 2, 2));
@@ -43,16 +44,16 @@ class HistoryTest {
         History h = new History(original, narrower);
         h.push(crop());
         h.push(new Edit.AutoLevels());
-        assertEquals(8, h.current().getWidth());
+        assertEquals(8, h.current().width());
         assertTrue(h.modified());
         assertEquals("edit.auto-levels", h.undoable().orElseThrow().key());
-        assertEquals(9, h.undo().getWidth());
+        assertEquals(9, h.undo().width());
         assertEquals("edit.auto-levels", h.redoable().orElseThrow().key());
-        assertEquals(10, h.undo().getWidth());
+        assertEquals(10, h.undo().width());
         assertSame(original, h.current());
         assertFalse(h.modified());
-        assertEquals(9, h.redo().getWidth());
-        assertEquals(8, h.redo().getWidth());
+        assertEquals(9, h.redo().width());
+        assertEquals(8, h.redo().width());
         assertEquals(2, applied.size(), "remembered pictures are used again");
     }
 
@@ -76,10 +77,10 @@ class HistoryTest {
         h.push(crop());
         h.forget();
         applied.clear();
-        assertEquals(8, h.undo().getWidth());
+        assertEquals(8, h.undo().width());
         assertEquals(2, applied.size(), "two steps applied again to the original");
         applied.clear();
-        assertEquals(7, h.redo().getWidth());
+        assertEquals(7, h.redo().width());
         assertEquals(1, applied.size(), "from the picture just made");
     }
 

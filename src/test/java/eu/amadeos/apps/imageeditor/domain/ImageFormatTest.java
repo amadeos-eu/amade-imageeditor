@@ -23,7 +23,8 @@ class ImageFormatTest {
 
     @Test
     void writableFormatsInDialogOrder() {
-        assertEquals(List.of(ImageFormat.JPEG, ImageFormat.PNG, ImageFormat.WEBP, ImageFormat.TIFF, ImageFormat.BMP),
+        assertEquals(List.of(ImageFormat.JPEG, ImageFormat.PNG, ImageFormat.WEBP, ImageFormat.TIFF, ImageFormat.BMP,
+                        ImageFormat.ORA),
                 ImageFormat.writableFormats());
         assertFalse(ImageFormat.PSD.writable());
         assertFalse(ImageFormat.GIF.writable());
