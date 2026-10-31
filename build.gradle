@@ -1,0 +1,192 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'eu.amadeos'
+// CI computes the version from the Conventional Commits since the last release tag and passes it as
+// -PappVersion (amadeos-eu/amadeos-ci scripts/next-version.sh); a build without it is a local development build.
+version = findProperty('appVersion') ?: '0.0.0-dev.0'
+// Debian sorts 1.1.0~dev.57 before 1.1.0 (with - it would sort after it).
+def debVersion = version.toString().replace('-', '~')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+application {
+    mainClass = 'eu.amadeos.apps.imageeditor.bootstrap.AmadeImageEditorApplication'
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    // Theme, Motif look, start-up and XDG helpers shared by all amadeOS applications.
+    // With ../amade-commons checked out, settings.gradle builds that checkout instead (composite build).
+    implementation 'com.github.amadeos-eu:amade-commons:119aabf416'
+    // The EXIF orientation, so that photos from phones open upright.
+    implementation 'com.drewnoakes:metadata-extractor:2.21.0'
+    // ImageIO plugins: JPEG (CMYK, broken colour profiles), TIFF (LZW, Deflate, JPEG), BMP, PNM and TGA read
+    // and write; WebP, PSD, IFF, PICT, SGI and ICNS read only. WebP is written by cwebp (ImageSaver).
+    def twelveMonkeys = '3.15.2'
+    ['jpeg', 'tiff', 'webp', 'bmp', 'pnm', 'tga', 'psd', 'iff', 'pict', 'sgi', 'icns'].each {
+        runtimeOnly "com.twelvemonkeys.imageio:imageio-${it}:${twelveMonkeys}"
+    }
+    runtimeOnly 'ch.qos.logback:logback-classic:1.5.18'
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    // Tests compare English texts, whatever the language of the build machine.
+    systemProperty 'user.language', 'en'
+    systemProperty 'user.country', 'US'
+}
+
+// The TwelveMonkeys plugins each register their readers in META-INF/services; in the fat jar those files
+// would overwrite each other, so they are joined here and the joined copies go into the jar.
+def mergedServices = layout.buildDirectory.dir('merged-services')
+tasks.register('mergeServices') {
+    inputs.files(configurations.runtimeClasspath)
+    outputs.dir(mergedServices)
+    doLast {
+        def target = mergedServices.get().dir('META-INF/services').asFile
+        delete(target)
+        target.mkdirs()
+        Map<String, Set<String>> services = [:].withDefault { new LinkedHashSet<String>() }
+        configurations.runtimeClasspath.files.findAll { it.name.endsWith('.jar') }.each { jarFile ->
+            zipTree(jarFile).matching { include 'META-INF/services/*' }.each { file ->
+                file.readLines('UTF-8').collect { it.replaceAll('#.*', '').strip() }.findAll { it }
+                        .each { services[file.name] << it }
+            }
+        }
+        services.each { name, lines -> new File(target, name).text = lines.join('\n') + '\n' }
+    }
+}
+
+jar {
+    dependsOn 'mergeServices'
+    archiveBaseName = 'amade-imageeditor'
+    manifest {
+        attributes(
+            'Main-Class': 'eu.amadeos.apps.imageeditor.bootstrap.AmadeImageEditorApplication',
+            'Implementation-Title': 'amade-imageeditor',
+            'Implementation-Version': project.version
+        )
+    }
+    from(mergedServices)
+    from({
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }) {
+        exclude 'META-INF/services/*'
+    }
+    // Signed dependency jars would otherwise invalidate the fat jar.
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.register('deb') {
+    dependsOn jar
+    description = 'Builds a standard Debian (.deb) package for amade-imageeditor'
+    group = 'distribution'
+
+    doLast {
+        def buildDirFile = layout.buildDirectory.get().asFile
+        def stagingDir = new File(buildDirFile, 'deb-staging')
+        delete(stagingDir)
+
+        def optDir = new File(stagingDir, 'opt/amade-imageeditor')
+        def binDir = new File(stagingDir, 'usr/bin')
+        def appDir = new File(stagingDir, 'usr/share/applications')
+        def iconDir = new File(stagingDir, 'usr/share/icons/hicolor/48x48/apps')
+        def docDir = new File(stagingDir, 'usr/share/doc/amade-imageeditor')
+        def debianDir = new File(stagingDir, 'DEBIAN')
+        def distDir = new File(buildDirFile, 'distributions')
+        [optDir, binDir, appDir, iconDir, docDir, debianDir, distDir]*.mkdirs()
+
+        copy {
+            from jar.archiveFile
+            into optDir
+            rename { 'amade-imageeditor.jar' }
+        }
+
+        def launcher = new File(binDir, 'amade-imageeditor')
+        launcher.text = """#!/bin/sh
+exec /usr/bin/java -jar /opt/amade-imageeditor/amade-imageeditor.jar "\$@"
+"""
+        launcher.setExecutable(true, false)
+
+        copy {
+            from 'packaging/amade-imageeditor.desktop'
+            into appDir
+        }
+        // AppStream metadata: name, description and screenshot for amadeOS Software (and a repository's
+        // appstream-generator).
+        copy {
+            from 'packaging/eu.amadeos.apps.imageeditor.metainfo.xml'
+            into new File(stagingDir, "usr/share/metainfo")
+        }
+        copy {
+            from 'src/main/resources/icons/amade-imageeditor.png'
+            into iconDir
+        }
+        copy {
+            from 'LICENSE'
+            into docDir
+            rename { 'copyright' }
+        }
+
+        new File(debianDir, 'control').text = """Package: amade-imageeditor
+Version: ${debVersion}
+Section: graphics
+Priority: optional
+Architecture: all
+Depends: openjdk-25-jre | java-runtime (>= 25)
+Recommends: libjpeg-turbo-progs, webp
+Maintainer: amadeOS Project <developers@datazuul.com>
+Description: Image editor for amadeOS
+ Crops, rotates, flips and straightens photos and pictures, changes their
+ size, brightness, contrast, saturation and warmth, and saves them as
+ JPEG, PNG, TIFF, WebP or BMP. Opens many more formats through the
+ TwelveMonkeys ImageIO plugins. Unlimited undo; the camera data, title and
+ keywords of JPEGs can be kept. Quarter turns of JPEGs are saved without
+ loss by jpegtran, WebP files are written by cwebp.
+ Part of the amadeOS desktop.
+"""
+
+        def debFile = new File(distDir, "amade-imageeditor_${debVersion}_all.deb")
+        def process = new ProcessBuilder('dpkg-deb', '--root-owner-group', '--build',
+                stagingDir.absolutePath, debFile.absolutePath)
+                .redirectErrorStream(true)
+                .start()
+        process.inputStream.eachLine { println it }
+        if (process.waitFor() != 0) {
+            throw new GradleException('dpkg-deb failed')
+        }
+        println "[deb] Created ${debFile.absolutePath}"
+    }
+}
+
+tasks.register('installToAmadeOs') {
+    dependsOn 'deb'
+    description = 'Builds and drops the .deb package into ../amadeos/config/packages.chroot/'
+    group = 'distribution'
+
+    doLast {
+        def targetDir = file('../amadeos/config/packages.chroot')
+        targetDir.mkdirs()
+        def debFile = new File(layout.buildDirectory.get().asFile, "distributions/amade-imageeditor_${debVersion}_all.deb")
+        copy {
+            from debFile
+            into targetDir
+        }
+        println "[installToAmadeOs] Copied ${debFile.name} to ${targetDir.absolutePath}"
+    }
+}
