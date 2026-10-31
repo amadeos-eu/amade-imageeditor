@@ -27,7 +27,9 @@ class TextRendererTest {
         double cx = r.x() + r.image().getWidth() / 2.0, cy = r.y() + r.image().getHeight() / 2.0;
         assertTrue(Math.abs(cx - 300) < box.size() / 4, "x " + cx);
         assertTrue(Math.abs(cy - 200) < box.size() / 4, "y " + cy);
-        assertTrue(r.image().getHeight() > 2 * box.size(), "two lines");
+        // The second line adds about one line height, whatever the font's own spacing.
+        int oneLine = TextRenderer.render(box.withText("Lake")).image().getHeight();
+        assertTrue(r.image().getHeight() > oneLine + box.size() * 0.7, r.image().getHeight() + " vs " + oneLine);
     }
 
     @Test
