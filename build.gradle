@@ -120,10 +120,12 @@ tasks.register('deb') {
         def launcher = new File(binDir, 'amade-imageeditor')
         // The options all amadeOS programs share (heap, garbage collector) come first from the argument file
         // amadeos-session installs; the options after it win over them.
+        // The shared options give programs only the quick C1 compiler; this program computes a lot and takes the
+        // optimising compiler back with -XX:TieredStopAtLevel=4.
         launcher.text = """#!/bin/sh
 OPTIONS=/etc/amadeos/java/app.options
 [ -r "\$OPTIONS" ] || OPTIONS=/dev/null
-exec /usr/bin/java "@\$OPTIONS" -Xmx1g -jar /opt/amade-imageeditor/amade-imageeditor.jar "\$@"
+exec /usr/bin/java "@\$OPTIONS" -Xmx1g -XX:TieredStopAtLevel=4 -jar /opt/amade-imageeditor/amade-imageeditor.jar "\$@"
 """
         launcher.setExecutable(true, false)
 
